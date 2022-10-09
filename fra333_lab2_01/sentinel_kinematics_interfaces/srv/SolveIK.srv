@@ -1,0 +1,6 @@
+# add resquest
+geometry_msgs/Point taskspace
+std_msgs/Bool elbowup
+---
+# add response
+std_msgs/Bool status

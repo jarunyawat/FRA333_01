@@ -1,0 +1,86 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="sentinel">
+    <!-- add more codes -->
+    <link name="base_link">
+        <visual>
+        <origin xyz="0.0 0.0 0.005"/>
+            <geometry>
+                <mesh filename="package://sentinel_description/mesh/base_link.STL"/>
+            </geometry>
+        </visual>
+    </link>
+    <link name="link_0">
+        <visual>
+            <geometry>
+                <mesh filename="package://sentinel_description/mesh/link_0.STL"/>
+            </geometry>
+        </visual>
+    </link>
+    <link name="link_1">
+        <visual>
+            <geometry>
+                <mesh filename="package://sentinel_description/mesh/link_1.STL"/>
+            </geometry>
+        </visual>
+    </link>
+    <link name="link_2">
+        <visual>
+            <geometry>
+                <mesh filename="package://sentinel_description/mesh/link_2.STL"/>
+            </geometry>
+        </visual>
+    </link>
+    <link name="link_3">
+        <visual>
+            <origin rpy="3.14159265359 0.0 1.57079632679"/>
+            <geometry>
+                <mesh filename="package://sentinel_description/mesh/link_3.STL"/>
+            </geometry>
+        </visual>
+    </link>
+    <link name="gripper">
+        <visual>
+            <origin rpy="-1.57079632679 0.0 0.0"/>
+            <geometry>
+                <mesh filename="package://sentinel_description/mesh/gripper.STL"/>
+            </geometry>
+        </visual>
+    </link>
+
+    <joint name="base_to_link_0" type="fixed">
+       <parent link="base_link"/>
+       <child link="link_0"/>
+       <origin xyz="0.0 0.0 0.035"/>
+     </joint>
+
+     <joint name="link_0_to_1" type="revolute">
+       <parent link="link_0"/>
+       <child link="link_1"/>
+       <origin xyz="0.0 0.0 0.045"/>
+       <axis xyz="0.0 0.0 1.0"/>
+       <limit lower="-3" upper="3" effort="30.0" velocity="1.0"/>
+     </joint>
+
+     <joint name="link_1_to_2" type="revolute">
+       <parent link="link_1"/>
+       <child link="link_2"/>
+       <origin xyz="0.13 0.0 0.065" rpy="0.0 -1.57079632679 0.0"/>
+       <axis xyz="0.0 0.0 -1.0"/>
+       <limit lower="0" upper="3" effort="30.0" velocity="1.0"/>
+     </joint>
+
+     <joint name="link_2_to_3" type="revolute">
+       <parent link="link_2"/>
+       <child link="link_3"/>
+       <origin xyz="0.0 0.39 0.14"/>
+       <axis xyz="0.0 0.0 -1.0"/>
+       <limit lower="-2" upper="2" effort="30.0" velocity="1.0"/>
+     </joint>
+
+     <joint name="link_3_to_gripper" type="fixed">
+       <parent link="link_3"/>
+       <child link="gripper"/>
+       <origin xyz="0.0 0.36 0.0"/>
+     </joint>
+
+</robot>
