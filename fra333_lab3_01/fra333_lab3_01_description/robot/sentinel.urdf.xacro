@@ -35,7 +35,7 @@
         <inertial>
             <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <mass value="2.13412"/>
-            <inertia ixx="0.0092143483" ixy="0.0000029017" ixz="0.0001157018" iyy="0.0099694985" iyz="0.00000219019" izz="0.0021104429"/>
+            <inertia ixx="0.0092143483" ixy="0.0000029017" ixz="-0.0001157018" iyy="0.0099694985" iyz="-0.00000219019" izz="0.0021104429"/>
         </inertial>
     </link>
     <link name="link_2">
@@ -53,7 +53,7 @@
         <inertial>
             <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <mass value="3.17536"/>
-            <inertia ixx="0.0046929646" ixy="0.0" ixz="0.007602469" iyy="0.196888" iyz="0.0" izz="0.195576"/>
+            <inertia ixx="0.0046929646" ixy="0.0" ixz="-0.007602469" iyy="0.196888" iyz="0.0" izz="0.195576"/>
         </inertial>
     </link>
     <link name="link_3">
@@ -71,7 +71,7 @@
         <inertial>
             <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <mass value="3.38524"/>
-            <inertia ixx="0.0029246047" ixy="0.00000000132" ixz="0.00000704893" iyy="0.04357027" iyz="0.00000000006" izz="0.04298572"/>
+            <inertia ixx="0.0029246047" ixy="0.00000000132" ixz="-0.00000704893" iyy="0.04357027" iyz="-0.00000000006" izz="0.04298572"/>
         </inertial>
     </link>
     <link name="gripper">

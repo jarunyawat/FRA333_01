@@ -141,15 +141,6 @@ class Trajectory_publisher(Node):
 
 
     def timer_callback(self):
-        # self.i = self.i + 1
-        # if self.i == 30:
-        #     self.i = 0
-        #     if self.is_change_point == False:
-        #         self.is_change_point = True
-        #         self.velocity = self.reverse_velocity
-        #     else:
-        #         self.is_change_point = False
-        #         self.velocity = self.forward_velocity
         if self.state == "SET_HOME":
             joint_home = [0.0, pi/3, pi/2]
             self.velocity = [0.0, 2*(joint_home[1]-self.joint_config[1]), 3*(joint_home[2]-self.joint_config[2])]
@@ -178,28 +169,6 @@ class Trajectory_publisher(Node):
                 linear_velocity[1] = -0.2
             joint_velocity = np.linalg.inv(self.J[3:,:]) @ linear_velocity
             self.velocity = [joint_velocity[0], joint_velocity[1], joint_velocity[2]]
-        # elif self.state == "forward":
-        #     # self.get_logger().info("forward")
-        #     linear_velocity = np.array([0.0, 0.0, -0.2])
-        #     joint_velocity = np.linalg.inv(self.J[3:,:]) @ linear_velocity
-        #     # self.get_logger().info(f"{joint_velocity}")
-        #     # self.get_logger().info(f"{np.dot(self.J[3:,:],np.array([0.0, 0.0, 0.5]))}")
-        #     self.velocity = [joint_velocity[0], joint_velocity[1], joint_velocity[2]]
-        #     # self.velocity = [0.0, 0.0, 0.5]
-        #     if time.time() - self.counter_timer > 1:
-        #         self.state = "backward"
-        #         self.counter_timer = time.time()
-        # elif self.state == "backward":
-        #     # self.get_logger().info("backward")
-        #     linear_velocity = np.array([0.0, 0.0, 0.2])
-        #     joint_velocity = np.linalg.inv(self.J[3:,:]) @ linear_velocity
-        #     # self.get_logger().info(f"{joint_velocity}")
-        #     # self.get_logger().info(f"{np.dot(self.J[3:,:],np.array([0.0, 0.0, -0.5]))}")
-        #     self.velocity = [joint_velocity[0], joint_velocity[1], joint_velocity[2]]
-        #     # self.velocity = [0.0, 0.0, -0.5]
-        #     if time.time() - self.counter_timer > 1:
-        #         self.state = "forward"
-        #         self.counter_timer = time.time()
         velocity_pub_msg = Float64MultiArray()
         velocity_pub_msg.data = self.velocity
         if self.calibrate:
