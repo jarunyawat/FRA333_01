@@ -1,0 +1,4 @@
+std_msgs/UInt32 time
+geometry_msgs/Point destination
+---
+---
