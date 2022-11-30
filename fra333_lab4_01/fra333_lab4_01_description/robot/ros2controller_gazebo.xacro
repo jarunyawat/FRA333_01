@@ -28,7 +28,7 @@
 
     <!-- This plugin will publish the joint_states for the selected joints 
             (which robot_state_publisher can then use to broadcast the approprate tf). -->
-    <gazebo>
+    <!-- <gazebo>
         <plugin name="gazebo_ros_joint_state_publisher"
             filename="libgazebo_ros_joint_state_publisher.so">
             <update_rate>20</update_rate>
@@ -36,7 +36,7 @@
             <joint_name>link_1_to_2</joint_name>
             <joint_name>link_2_to_3</joint_name>
         </plugin>
-    </gazebo>
+    </gazebo> -->
 
     <!-- This plugin will read a JointTrajectory message from the /set_joint_trajectory topic 
             and move the machine accordingly. It's a bit clunky but it works. -->
@@ -127,7 +127,7 @@
 
     <gazebo>
         <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
-            <parameters>$(find fra333_lab3_01_description)/config/sentinel_controller.yaml</parameters>
+            <parameters>$(find fra333_lab4_01_description)/config/sentinel_controller.yaml</parameters>
         </plugin>
     </gazebo>
 

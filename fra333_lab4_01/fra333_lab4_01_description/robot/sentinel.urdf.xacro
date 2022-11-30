@@ -5,13 +5,13 @@
     <link name="link_0">
         <visual>
             <geometry>
-                <mesh filename="file:///$(find fra333_lab3_01_description)/mesh/link_0.STL"/>
+                <mesh filename="file:///$(find fra333_lab4_01_description)/mesh/link_0.STL"/>
             </geometry>
         </visual>
         <collision>
             <contact_coefficients mu="0" kp="1000.0" kd="1.0"/>
             <geometry>
-                <mesh filename="file:///$(find fra333_lab3_01_description)/mesh/link_0.STL"/>
+                <mesh filename="file:///$(find fra333_lab4_01_description)/mesh/link_0.STL"/>
             </geometry>
         </collision>
         <inertial>
@@ -23,13 +23,13 @@
     <link name="link_1">
         <visual>
             <geometry>
-                <mesh filename="file:///$(find fra333_lab3_01_description)/mesh/link_1.STL"/>
+                <mesh filename="file:///$(find fra333_lab4_01_description)/mesh/link_1.STL"/>
             </geometry>
         </visual>
         <collision>
             <contact_coefficients mu="0" kp="1000.0" kd="1.0"/>
             <geometry>
-                <mesh filename="file:///$(find fra333_lab3_01_description)/mesh/link_1.STL"/>
+                <mesh filename="file:///$(find fra333_lab4_01_description)/mesh/link_1.STL"/>
             </geometry>
         </collision>
         <inertial>
@@ -41,13 +41,13 @@
     <link name="link_2">
         <visual>
             <geometry>
-                <mesh filename="file:///$(find fra333_lab3_01_description)/mesh/link_2.STL"/>
+                <mesh filename="file:///$(find fra333_lab4_01_description)/mesh/link_2.STL"/>
             </geometry>
         </visual>
         <collision>
             <contact_coefficients mu="0" kp="1000.0" kd="1.0"/>
             <geometry>
-                <mesh filename="file:///$(find fra333_lab3_01_description)/mesh/link_2.STL"/>
+                <mesh filename="file:///$(find fra333_lab4_01_description)/mesh/link_2.STL"/>
             </geometry>
         </collision>
         <inertial>
@@ -59,13 +59,13 @@
     <link name="link_3">
         <visual>
             <geometry>
-                <mesh filename="file:///$(find fra333_lab3_01_description)/mesh/link_3.STL"/>
+                <mesh filename="file:///$(find fra333_lab4_01_description)/mesh/link_3.STL"/>
             </geometry>
         </visual>
         <collision>
             <contact_coefficients mu="0" kp="1000.0" kd="1.0"/>
             <geometry>
-                <mesh filename="file:///$(find fra333_lab3_01_description)/mesh/link_3.STL"/>
+                <mesh filename="file:///$(find fra333_lab4_01_description)/mesh/link_3.STL"/>
             </geometry>
         </collision>
         <inertial>
@@ -77,13 +77,13 @@
     <link name="gripper">
         <visual>
             <geometry>
-                <mesh filename="file:///$(find fra333_lab3_01_description)/mesh/gripper.STL"/>
+                <mesh filename="file:///$(find fra333_lab4_01_description)/mesh/gripper.STL"/>
             </geometry>
         </visual>
         <collision>
             <contact_coefficients mu="0" kp="1000.0" kd="1.0"/>
             <geometry>
-                <mesh filename="file:///$(find fra333_lab3_01_description)/mesh/gripper.STL"/>
+                <mesh filename="file:///$(find fra333_lab4_01_description)/mesh/gripper.STL"/>
             </geometry>
         </collision>
         <inertial>

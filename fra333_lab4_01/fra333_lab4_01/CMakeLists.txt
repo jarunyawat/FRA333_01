@@ -21,7 +21,7 @@ find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
 
 install(PROGRAMS
-  scripts/trajectory_gen.py
+  scripts/controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

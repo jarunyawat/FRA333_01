@@ -16,7 +16,7 @@ def generate_launch_description():
     sentinel_spawn = IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
                 PathJoinSubstitution([
-                    FindPackageShare('fra333_lab3_01_description'),
+                    FindPackageShare('fra333_lab4_01_description'),
                     'launch',
                     'sentinel_gazebo.launch.py'
                 ])
@@ -24,7 +24,7 @@ def generate_launch_description():
     )
     jog_node = Node(
         package="fra333_lab4_01",
-        executable="trajectory_gen.py"
+        executable="controller.py"
     )
     entity_to_run.add_action(sentinel_spawn)
     entity_to_run.add_action(jog_node)

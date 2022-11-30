@@ -15,7 +15,7 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
 
     # Specify the name of the package and path to xacro file within the package
-    pkg_name = 'fra333_lab3_01_description'
+    pkg_name = 'fra333_lab4_01_description'
     file_subpath = 'robot/sentinel.urdf.xacro'
 
 
@@ -25,7 +25,7 @@ def generate_launch_description():
 
     robot_controllers = PathJoinSubstitution(
         [
-            FindPackageShare("fra333_lab3_01_description"),
+            FindPackageShare("fra333_lab4_01_description"),
             "config",
             "sentinel_controller.yaml",
         ]
