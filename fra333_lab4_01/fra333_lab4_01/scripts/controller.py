@@ -1,13 +1,14 @@
 #!/usr/bin/python3
 import numpy as np
 from numpy import sin, cos, arctan2, pi
-import numpy as np
 import rclpy
 import sys
 from rclpy.node import Node
 from control_msgs.msg import DynamicJointState
-from std_msgs.msg import Float64MultiArray, UInt32, Float64
+from std_msgs.msg import Float64MultiArray
+from fra333_lab4_01_interface.srv import Destination
 from std_srvs.srv import Empty
+import time
 
 class Controller(Node):
 
@@ -15,12 +16,13 @@ class Controller(Node):
         super().__init__('controller_node')
         self.velocity_publihser = self.create_publisher(Float64MultiArray,"/forward_velocity_controller/commands",10)
         self.joint_feedback_sub = self.create_subscription(DynamicJointState,"/dynamic_joint_states",self.joint_feedback_callback,10)
-        self.enb_srv = self.create_service(Empty, "sentinel/enable",self.enb_callback)
+        self.enb_srv = self.create_service(Destination, "sentinel/enable",self.enb_callback)
         self.arrival_cli = self.create_client(Empty, 'sentinel/arrival')
-        self.control_rate = self.create_rate(100)
-        timer_period = 0.1
-        self.timer = self.create_timer(timer_period, self.timer_callback)
+        self.dt = 0.01
+        self.timer = self.create_timer(self.dt, self.timer_callback)
         self.joints = ['link_0_to_1','link_1_to_2','link_2_to_3']
+        self.joint_max = [3, 3, 2]
+        self.joint_min = [-3, 0, -2]
         self.velocity = [0.0, 0.0, 0.0]
         self.is_change_point = False
         self.i = 0
@@ -40,15 +42,22 @@ class Controller(Node):
         self.imu_data = [0.0, 0.0, 0.0]
         self.ws_feedback = None
         self.isEnb = False
+        self.ws_start = None
         self.ws_goal = None
         # controller parameter
-        self.Kp = 0.1
-        self.Ki = 0.2
-        self.Kd = 0.05
+        self.Kp = 1
+        self.Ki = 0.05
+        self.Kd = 10
         self.error = 0
         self.error_sum = 0
         self.last_error = 0
         self.error_diff = 0
+        #trajectoty parameter
+        self.A = 0
+        self.B = 0
+        self.C = 0
+        self.timeStamp = time.time()
+        self.timePeriod = 0
 
     def fk(self,q):
         H = np.eye(4)
@@ -101,8 +110,8 @@ class Controller(Node):
             joint_temp[1] = arctan2(z,np.sqrt(x**2+y**2)) - arctan2(l2*s2, l1+l2*c2)
             joint_temp[0] = arctan2(y,x) - pi/2
             if joint_temp[0]<=self.joint_max[0] and joint_temp[0]>=self.joint_min[0] and joint_temp[1]<=self.joint_max[1] and joint_temp[1]>=self.joint_min[1] and joint_temp[2]<=self.joint_max[2] and joint_temp[2]>=self.joint_min[2]:
-                return joint_temp
-        return self.joint_config
+                return np.array(joint_temp).copy()
+        return np.array(self.joint_config).copy()
 
     def endEffectorJacobian(self,q):
         Jw = list()
@@ -120,6 +129,15 @@ class Controller(Node):
             Jv.append(np.cross(R[j][:3,:3] @ np.array([0,0,1]).T, (p_e-P[j])))
         Je = np.vstack((np.array(Jw).T,np.array(Jv).T))
         return Je
+    
+    def checkSingularity(self,q):
+        Je = self.endEffectorJacobian(q)
+        #เนื่องจากหุ่นยนต์มี 3 joint จึงเลือกใช้ jacobian 3 ล่าง ในการทำ j_star เพื่อนำไปหา determinant
+        J_star = np.array(Je[3:])
+        #เมื่อค่า absolute ของ determinant ของ J_star มีค่าเข้าใกล้ 0 จะทำให้หุ่นยนต์เกิสภาวะ singularity
+        if np.abs(np.linalg.det(J_star)) <= 0.001:
+            return True
+        return False
 
     def joint_feedback_callback(self, data:DynamicJointState):
         joint_pos = list()
@@ -131,8 +149,58 @@ class Controller(Node):
         self.J = self.endEffectorJacobian(self.joint_config)
     
     def enb_callback(self,request,response):
+        #compute trajectory
+        tf = 0.1
+        joint_i = self.joint_config
+        [R, P] = self.fk(joint_i)
+        ws_i = R[-1][:3,-1]
+        ws_f = np.array([request.destination.x, request.destination.y, request.destination.z])
+        a_max = 1
+        v_max = 0.3
+        length = np.linalg.norm(ws_f-ws_i)
+        response = Destination.Response()
+        while True:
+            D = np.array([[5*tf**2, 4*tf, 3],
+                    [20*tf**2, 12*tf, 6],
+                    [tf**5, tf**4, tf**3]])
+            Da = np.array([[0, 4*tf, 3],
+                            [0, 12*tf, 6],
+                            [length, tf**4, tf**3]])
+            Db = np.array([[5*tf**2, 0, 3],
+                            [20*tf**2, 0, 6],
+                            [tf**5, length, tf**3]])
+            Dc = np.array([[5*tf**2, 4*tf, 0],
+                            [20*tf**2, 12*tf, 0],
+                            [tf**5, tf**4, length]])
+
+            A = np.linalg.det(Da)/np.linalg.det(D)
+            B = np.linalg.det(Db)/np.linalg.det(D)
+            C = np.linalg.det(Dc)/np.linalg.det(D)
+            t_half = tf/2
+            t_quater = tf/4
+            if np.abs(5*A*t_half**4 + 4*B*t_half**3 + 3*C*t_half**2)<=v_max and np.abs(20*A*t_quater**3 + 12*B*t_quater**2 + 6*C*t_quater)<=a_max:
+                break
+            tf = 1.1*tf
+        for t in np.arange(0,tf+self.dt,self.dt):
+            # lenght_percent = (A*t**5 + B*t**4 + C*t**3)/length
+            # pos_3d = (ws_f-ws_i)*lenght_percent + ws_i
+            wsd_t = 5*A*t**4 + 4*B*t**3 + 3*C*t**2
+            velo_3d = (ws_f-ws_i)/length * wsd_t
+            J = self.endEffectorJacobian(joint_i)
+            if self.checkSingularity(joint_i):
+                response.success.data = False
+                return response
+            joint_qd = np.linalg.inv(J[3:]) @ velo_3d
+            joint_i = joint_i + (joint_qd * self.dt)
         self.isEnb = True
-        self.ws_goal = request.destination
+        self.A = A
+        self.B = B
+        self.C = C
+        self.timePeriod = tf
+        self.timeStamp = time.time()
+        self.ws_start = ws_i
+        self.ws_goal = ws_f
+        response.success.data = True
         return response
 
     def send_request(self):
@@ -151,23 +219,35 @@ class Controller(Node):
                 self.send_request()
         elif self.state == "FORWARD":
             if self.isEnb:
-                q_ref = self.ik(self.ws_ref)
-                qd_ref = np.linalg.inv(self.J[3:]) @ self.wsd_ref
+                t = time.time() - self.timeStamp
+                if t <= self.timePeriod:
+                    lenght_percent = (self.A*t**5 + self.B*t**4 + self.C*t**3)/np.linalg.norm(self.ws_goal-self.ws_start)
+                    ws_t = (self.ws_goal-self.ws_start)*lenght_percent + self.ws_start
+                    wsd_t = 5*self.A*t**4 + 4*self.B*t**3 + 3*self.C*t**2
+                    velo_3d = (self.ws_goal-self.ws_start)/np.linalg.norm(self.ws_goal-self.ws_start) * wsd_t
+                else:
+                    ws_t = self.ws_goal
+                    velo_3d = np.array([0.0, 0.0, 0.0])
+                q_ref = self.ik(ws_t)
+                qd_ref = np.linalg.inv(self.J[3:]) @ velo_3d
                 self.error = q_ref - self.ik(self.ws_feedback)
                 self.error_sum += self.error
-                self.velocity = qd_ref + self.Kp * (self.error) + self.Ki * (self.error_sum) + self.Kd * (self.error_diff)
+                pid = qd_ref + self.Kp * (self.error) + self.Ki * (self.error_sum) + self.Kd * (self.error_diff)
+                self.velocity = [pid[0], pid[1], pid[2]]
                 self.error_diff = self.error - self.last_error
                 self.last_error = self.error
+                self.get_logger().info(f"{self.ws_feedback}")
                 if self.proximity(self.ws_feedback, self.ws_goal):
                     self.isEnb = False
-                    self.send_request()
+                    self.get_logger().info(f"destiantion arrival x:{self.ws_goal[0]} y:{self.ws_goal[1]} z:{self.ws_goal[2]}")
+                    # self.send_request()
             else:
                 self.velocity = [0.0, 0.0, 0.0]
         velocity_pub_msg.data = self.velocity
         self.velocity_publihser.publish(velocity_pub_msg)
             
     def proximity(self,q, q_check):
-        if (np.abs(q-q_check) < 0.00001).all():
+        if (np.abs(q-q_check) < 0.01).all():
             return 1
         return 0
  

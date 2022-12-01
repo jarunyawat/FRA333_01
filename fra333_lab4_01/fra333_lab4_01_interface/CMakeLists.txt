@@ -45,7 +45,7 @@ endif()
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/TrajectoryGoal.action"
-  "msg/TrajectoryPath.msg"
+  "srv/Destination.srv"
   DEPENDENCIES geometry_msgs
   DEPENDENCIES std_msgs
 )
