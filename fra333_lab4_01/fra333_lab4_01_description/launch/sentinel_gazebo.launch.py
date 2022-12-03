@@ -45,7 +45,7 @@ def generate_launch_description():
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(
             get_package_share_directory('gazebo_ros'), 'launch'), '/gazebo.launch.py']),
-        )
+    )
 
 
     spawn_entity = Node(package='gazebo_ros', executable='spawn_entity.py',
@@ -79,6 +79,17 @@ def generate_launch_description():
         arguments=["forward_velocity_controller", "--controller-manager", "/controller_manager"],
     )
 
+    rviz_path_to_package = get_package_share_directory("fra333_lab4_01_description")
+    rviz_sub_folder = 'config'
+    rviz_file_name = 'sentinel_kinematics.rviz'
+    rviz_file_path = os.path.join(rviz_path_to_package,rviz_sub_folder,rviz_file_name)
+
+    rviz = Node(
+    package='rviz2',
+    executable='rviz2',
+    name='rviz',
+    arguments=['-d', rviz_file_path],
+    output='screen')
 
     # Run the node
     return LaunchDescription([
@@ -88,7 +99,8 @@ def generate_launch_description():
         spawn_entity,
         joint_state_broadcaster_spawner,
         robot_controller_spawner,
-        control_node
+        control_node,
+        rviz
     ])
 
 

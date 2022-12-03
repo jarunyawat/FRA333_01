@@ -1,3 +1,4 @@
 geometry_msgs/Point destination
+std_msgs/Bool write
 ---
 std_msgs/Bool success

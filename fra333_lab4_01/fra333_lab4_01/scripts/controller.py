@@ -6,6 +6,8 @@ import sys
 from rclpy.node import Node
 from control_msgs.msg import DynamicJointState
 from std_msgs.msg import Float64MultiArray
+from nav_msgs.msg import Path
+from geometry_msgs.msg import PoseStamped
 from fra333_lab4_01_interface.srv import Destination
 from std_srvs.srv import Empty
 import time
@@ -15,6 +17,7 @@ class Controller(Node):
     def __init__(self):
         super().__init__('controller_node')
         self.velocity_publihser = self.create_publisher(Float64MultiArray,"/forward_velocity_controller/commands",10)
+        self.path_publihser = self.create_publisher(Path,"/sentinel/path",10)
         self.joint_feedback_sub = self.create_subscription(DynamicJointState,"/dynamic_joint_states",self.joint_feedback_callback,10)
         self.enb_srv = self.create_service(Destination, "sentinel/enable",self.enb_callback)
         self.arrival_cli = self.create_client(Empty, 'sentinel/arrival')
@@ -45,19 +48,22 @@ class Controller(Node):
         self.ws_start = None
         self.ws_goal = None
         # controller parameter
-        self.Kp = 1
-        self.Ki = 0.05
-        self.Kd = 10
+        self.Kp = np.array([1, 3, 3])
+        self.Ki = np.array([0.001, 0.002, 0.003])
+        self.Kd = np.array([2.5, 2, 2])
         self.error = 0
         self.error_sum = 0
         self.last_error = 0
         self.error_diff = 0
         #trajectoty parameter
+        self.a_max = 0.5
+        self.v_max = 0.2
         self.A = 0
         self.B = 0
         self.C = 0
         self.timeStamp = time.time()
         self.timePeriod = 0
+        self.path_msg = Path()
 
     def fk(self,q):
         H = np.eye(4)
@@ -155,8 +161,6 @@ class Controller(Node):
         [R, P] = self.fk(joint_i)
         ws_i = R[-1][:3,-1]
         ws_f = np.array([request.destination.x, request.destination.y, request.destination.z])
-        a_max = 1
-        v_max = 0.3
         length = np.linalg.norm(ws_f-ws_i)
         response = Destination.Response()
         while True:
@@ -178,7 +182,7 @@ class Controller(Node):
             C = np.linalg.det(Dc)/np.linalg.det(D)
             t_half = tf/2
             t_quater = tf/4
-            if np.abs(5*A*t_half**4 + 4*B*t_half**3 + 3*C*t_half**2)<=v_max and np.abs(20*A*t_quater**3 + 12*B*t_quater**2 + 6*C*t_quater)<=a_max:
+            if np.abs(5*A*t_half**4 + 4*B*t_half**3 + 3*C*t_half**2)<=self.v_max and np.abs(20*A*t_quater**3 + 12*B*t_quater**2 + 6*C*t_quater)<=self.a_max:
                 break
             tf = 1.1*tf
         for t in np.arange(0,tf+self.dt,self.dt):
@@ -197,9 +201,9 @@ class Controller(Node):
         self.B = B
         self.C = C
         self.timePeriod = tf
-        self.timeStamp = time.time()
         self.ws_start = ws_i
         self.ws_goal = ws_f
+        self.write = request.write.data
         response.success.data = True
         return response
 
@@ -210,46 +214,75 @@ class Controller(Node):
 
     def timer_callback(self):
         velocity_pub_msg = Float64MultiArray()
+        pose_msg = PoseStamped()
         if self.state == "SET_HOME":
             joint_home = [0.0, pi/2, pi/2]
-            self.velocity = [0.0, 2*(joint_home[1]-self.joint_config[1]), 3*(joint_home[2]-self.joint_config[2])]
+            self.velocity = [0.0, 5*(joint_home[1]-self.joint_config[1]), 5*(joint_home[2]-self.joint_config[2])]
             if abs(joint_home[1]-self.joint_config[1]) < 0.1 and abs(joint_home[2]-self.joint_config[2]) < 0.1:
-                self.state = "FORWARD"
-                self.get_logger().info("FORWARD")
+                self.state = "WAIT"
+                R, P = self.fk(joint_home)
+                self.ws_goal = P[-1]
+                self.get_logger().info("WAIT")
                 self.send_request()
         elif self.state == "FORWARD":
-            if self.isEnb:
-                t = time.time() - self.timeStamp
-                if t <= self.timePeriod:
-                    lenght_percent = (self.A*t**5 + self.B*t**4 + self.C*t**3)/np.linalg.norm(self.ws_goal-self.ws_start)
-                    ws_t = (self.ws_goal-self.ws_start)*lenght_percent + self.ws_start
-                    wsd_t = 5*self.A*t**4 + 4*self.B*t**3 + 3*self.C*t**2
-                    velo_3d = (self.ws_goal-self.ws_start)/np.linalg.norm(self.ws_goal-self.ws_start) * wsd_t
-                else:
-                    ws_t = self.ws_goal
-                    velo_3d = np.array([0.0, 0.0, 0.0])
-                q_ref = self.ik(ws_t)
-                qd_ref = np.linalg.inv(self.J[3:]) @ velo_3d
-                self.error = q_ref - self.ik(self.ws_feedback)
-                self.error_sum += self.error
-                pid = qd_ref + self.Kp * (self.error) + self.Ki * (self.error_sum) + self.Kd * (self.error_diff)
-                self.velocity = [pid[0], pid[1], pid[2]]
-                self.error_diff = self.error - self.last_error
-                self.last_error = self.error
-                self.get_logger().info(f"{self.ws_feedback}")
-                if self.proximity(self.ws_feedback, self.ws_goal):
-                    self.isEnb = False
-                    self.get_logger().info(f"destiantion arrival x:{self.ws_goal[0]} y:{self.ws_goal[1]} z:{self.ws_goal[2]}")
-                    # self.send_request()
+            t = time.time() - self.timeStamp
+            if t <= self.timePeriod:
+                lenght_percent = (self.A*t**5 + self.B*t**4 + self.C*t**3)/np.linalg.norm(self.ws_goal-self.ws_start)
+                ws_t = (self.ws_goal-self.ws_start)*lenght_percent + self.ws_start
+                wsd_t = 5*self.A*t**4 + 4*self.B*t**3 + 3*self.C*t**2
+                velo_3d = (self.ws_goal-self.ws_start)/np.linalg.norm(self.ws_goal-self.ws_start) * wsd_t
             else:
-                self.velocity = [0.0, 0.0, 0.0]
+                ws_t = self.ws_goal
+                velo_3d = np.array([0.0, 0.0, 0.0])
+            self.control(ws_t,velo_3d)
+            # self.get_logger().info(f"{self.ws_feedback}")
+            if self.write:
+                pose_msg.header.stamp = self.get_clock().now().to_msg()
+                pose_msg.pose.position.x = self.ws_feedback[0]
+                pose_msg.pose.position.y = self.ws_feedback[1]
+                pose_msg.pose.position.z = self.ws_feedback[2]
+                self.path_msg.poses.append(pose_msg)
+            if self.proximity(self.ws_feedback, self.ws_goal):
+                self.isEnb = False
+                self.state = "WAIT"
+                self.error = 0
+                self.error_sum = 0
+                self.last_error = 0
+                self.error_diff = 0
+                self.get_logger().info(f"destiantion arrival x:{self.ws_goal[0]} y:{self.ws_goal[1]} z:{self.ws_goal[2]}")
+                self.send_request()
+        elif self.state == "WAIT":
+            velo_3d = np.array([0.0, 0.0, 0.0])
+            self.control(self.ws_goal,velo_3d)
+            # self.get_logger().info(f"{self.ws_feedback}")
+            if self.isEnb:
+                self.timeStamp = time.time()
+                self.error = 0
+                self.error_sum = 0
+                self.last_error = 0
+                self.error_diff = 0
+                self.state = "FORWARD"
         velocity_pub_msg.data = self.velocity
+        self.path_msg.header.stamp = pose_msg.header.stamp
+        self.path_msg.header.frame_id = 'world'
+        self.path_publihser.publish(self.path_msg)
         self.velocity_publihser.publish(velocity_pub_msg)
             
     def proximity(self,q, q_check):
-        if (np.abs(q-q_check) < 0.01).all():
+        if (np.linalg.norm(q-q_check) < 0.005).all():
             return 1
         return 0
+    
+    def control(self,ws_t,v_t):
+        q_ref = self.ik(ws_t)
+        qd_ref = np.linalg.inv(self.J[3:]) @ v_t
+        self.error = q_ref - self.ik(self.ws_feedback)
+        self.error_sum += self.error
+        pid = qd_ref + self.Kp * (self.error) + self.Ki * (self.error_sum) + self.Kd * (self.error_diff)
+        self.velocity = [pid[0], pid[1], pid[2]]
+        self.error_diff = self.error - self.last_error
+        self.last_error = self.error
+
  
 def main(args=None):
     rclpy.init(args=args)

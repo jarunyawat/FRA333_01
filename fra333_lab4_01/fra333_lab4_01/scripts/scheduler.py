@@ -5,23 +5,89 @@ import numpy as np
 import rclpy
 import sys
 from rclpy.node import Node
-from control_msgs.msg import DynamicJointState
-from std_msgs.msg import Float64MultiArray, UInt32, Float64
 from std_srvs.srv import Empty
+from fra333_lab4_01_interface.srv import Destination
+from geometry_msgs.msg import Point
 
 class Scheduler(Node):
 
     def __init__(self):
         super().__init__('schedule_node')
-        self.enb_cli = self.create_client(Empty, "sentinel/enable")
-        self.arrival_srv = self.create_service(Empty, 'sentinel/enable', self.arrival_callback)
+        self.enb_cli = self.create_client(Destination, "sentinel/enable")
+        self.arrival_srv = self.create_service(Empty, 'sentinel/arrival', self.arrival_callback)
+        self.last_node = None
+        self.edge = [[(-0.4,0.4),(-0.4,0.6)], # F
+                    [(-0.4,0.6),(-0.25,0.6)], # F
+                    [(-0.4,0.5),(-0.25,0.5)], # F
+                    [(-0.15,0.6),(-0.15,0.4)], # I
+                    [(-0.2,0.6),(-0.1,0.6)], # I
+                    [(-0.2,0.4),(-0.1,0.4)], # I
+                    [(-0.05,0.6),(-0.05,0.4)], # B
+                    [(-0.05,0.6),(0.05,0.6)], # B
+                    [(0.05,0.6),(0.1,0.55)], # B
+                    [(0.1,0.55),(0.1,0.525)], # B
+                    [(0.1,0.525),(0.05,0.5)], # B
+                    [(0.05,0.5),(-0.05,0.5)], # B
+                    [(0.05,0.5),(0.1,0.475)], # B
+                    [(0.1,0.475),(0.1,0.45)], # B
+                    [(0.1,0.45),(0.05,0.4)], # B
+                    [(0.05,0.4),(-0.05,0.4)], # B
+                    [(0.2,0.6),(0.3,0.6)],
+                    [(0.3,0.6),(0.35,0.525)],
+                    [(0.35,0.525),(0.35,0.475)],
+                    [(0.35,0.475),(0.3,0.4)],
+                    [(0.3,0.4),(0.2,0.4)],
+                    [(0.2,0.4),(0.15,0.475)],
+                    [(0.15,0.475),(0.15,0.525)],
+                    [(0.15,0.525),(0.2,0.6)],] 
+        self.node_idx = 0
+        self.edge_idx = 0
+        self.state = "START"
 
     def arrival_callback(self,request,response):
-        self.send_request()
+        if self.edge_idx < len(self.edge):
+            self.send_request()
         return response
     
     def send_request(self):
-        req = Empty.Request()
+        req = Destination.Request()
+        point = Point()
+        if self.state == "START":
+            self.node_idx = 0
+            point.x = self.edge[self.edge_idx][self.node_idx][0]
+            point.y = self.edge[self.edge_idx][self.node_idx][1]
+            if self.last_node != None:
+                if np.abs(point.x - self.last_node[0]) < 0.001 and np.abs(point.y - self.last_node[1]) < 0.001:
+                    self.node_idx = 1
+                    point.x = self.edge[self.edge_idx][self.node_idx][0]
+                    point.y = self.edge[self.edge_idx][self.node_idx][1]
+                    point.z = 0.1
+                    self.last_node = [point.x, point.y]
+                    req.write.data = True
+                    self.edge_idx += 1
+                    self.state = "START"
+                else:
+                    point.z = 0.2
+                    self.state = "LIFT"
+            else:
+                point.z = 0.1
+                self.state = "WRITE"
+        elif self.state == "LIFT":
+            point.x = self.edge[self.edge_idx][self.node_idx][0]
+            point.y = self.edge[self.edge_idx][self.node_idx][1]
+            point.z = 0.1
+            self.state = "WRITE"
+        elif self.state == "WRITE":
+            self.node_idx = 1
+            point.x = self.edge[self.edge_idx][self.node_idx][0]
+            point.y = self.edge[self.edge_idx][self.node_idx][1]
+            point.z = 0.1
+            req.write.data = True
+            self.last_node = [point.x, point.y]
+            self.state = "START"
+            self.edge_idx += 1
+        self.get_logger().info(f"x:{point.x}, y:{point.y} z:{point.z}")
+        req.destination = point
         self.future = self.enb_cli.call_async(req)
         return self.future.result()
  

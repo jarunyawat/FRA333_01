@@ -60,9 +60,9 @@ def generate_launch_description():
     # launch_description = LaunchDescription()
     # launch_description.add_action(rviz)
     # launch_description.add_action(robot_state_publisher)
-    robot_path_to_package = get_package_share_directory("sentinel_description")
+    robot_path_to_package = get_package_share_directory("fra333_lab4_01_description")
     robot_sub_folder = 'robot'
-    robot_file_name = 'sentinel.urdf'
+    robot_file_name = 'sentinel.urdf.xacro'
     robot_description_path = os.path.join(robot_path_to_package,robot_sub_folder,robot_file_name)
     with open(robot_description_path, 'r') as infp:
         robot_description = infp.read()
