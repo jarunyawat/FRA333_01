@@ -21,6 +21,20 @@ class Controller(Node):
         self.joint_feedback_sub = self.create_subscription(DynamicJointState,"/dynamic_joint_states",self.joint_feedback_callback,10)
         self.enb_srv = self.create_service(Destination, "sentinel/enable",self.enb_callback)
         self.arrival_cli = self.create_client(Empty, 'sentinel/arrival')
+        #load parameter from yaml
+        self.declare_parameters(namespace='', parameters=[
+            ('velocity_max', 0.2),
+            ('acceleration_max', 0.5),
+            ('Kp.Kp_joint_1', 1.0),
+            ('Kp.Kp_joint_2', 3.0),
+            ('Kp.Kp_joint_3', 3.0),
+            ('Ki.Ki_joint_1', 0.001),
+            ('Ki.Ki_joint_2', 0.002),
+            ('Ki.Ki_joint_3', 0.003),
+            ('Kd.Kd_joint_1', 2.0),
+            ('Kd.Kd_joint_2', 2.0),
+            ('Kd.Kd_joint_3', 2.0),
+        ])
         self.dt = 0.01
         self.timer = self.create_timer(self.dt, self.timer_callback)
         self.joints = ['link_0_to_1','link_1_to_2','link_2_to_3']
@@ -48,22 +62,26 @@ class Controller(Node):
         self.ws_start = None
         self.ws_goal = None
         # controller parameter
-        self.Kp = np.array([1, 3, 3])
-        self.Ki = np.array([0.001, 0.002, 0.003])
-        self.Kd = np.array([2.5, 2, 2])
+        self.Kp = np.array([self.get_parameter('Kp.Kp_joint_1').get_parameter_value().double_value, self.get_parameter('Kp.Kp_joint_2').get_parameter_value().double_value, self.get_parameter('Kp.Kp_joint_3').get_parameter_value().double_value])
+        self.Ki = np.array([self.get_parameter('Ki.Ki_joint_1').get_parameter_value().double_value, self.get_parameter('Ki.Ki_joint_2').get_parameter_value().double_value, self.get_parameter('Ki.Ki_joint_3').get_parameter_value().double_value])
+        self.Kd = np.array([self.get_parameter('Kd.Kd_joint_1').get_parameter_value().double_value, self.get_parameter('Kd.Kd_joint_2').get_parameter_value().double_value, self.get_parameter('Kd.Kd_joint_3').get_parameter_value().double_value])
         self.error = 0
         self.error_sum = 0
         self.last_error = 0
         self.error_diff = 0
         #trajectoty parameter
-        self.a_max = 0.5
-        self.v_max = 0.2
+        self.a_max = self.get_parameter('acceleration_max').get_parameter_value().double_value
+        self.v_max = self.get_parameter('velocity_max').get_parameter_value().double_value
+        # self.a_max = 0.5
+        # self.v_max = 0.2
         self.A = 0
         self.B = 0
         self.C = 0
         self.timeStamp = time.time()
         self.timePeriod = 0
         self.path_msg = Path()
+        self.get_logger().info(f"Kp: {self.Kp} Ki: {self.Ki} Kd: {self.Kd}")
+        self.get_logger().info(f"max velocity: {self.v_max} max acceleration: {self.a_max}")
 
     def fk(self,q):
         H = np.eye(4)
@@ -297,7 +315,7 @@ def main(args=None):
         raise
     finally:
         controller.destroy_node()
-        rclpy.shutdown() 
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
