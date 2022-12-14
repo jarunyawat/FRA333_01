@@ -11,6 +11,8 @@ from geometry_msgs.msg import PoseStamped
 from fra333_lab4_01_interface.srv import Destination
 from std_srvs.srv import Empty
 import time
+from rclpy.action import ActionClient
+from fra333_lab4_01_interface.action import TrajectoryGoal
 
 class Controller(Node):
 
@@ -21,6 +23,7 @@ class Controller(Node):
         self.joint_feedback_sub = self.create_subscription(DynamicJointState,"/dynamic_joint_states",self.joint_feedback_callback,10)
         self.enb_srv = self.create_service(Destination, "sentinel/enable",self.enb_callback)
         self.arrival_cli = self.create_client(Empty, 'sentinel/arrival')
+        self._action_client = ActionClient(self, TrajectoryGoal, 'generate_path')
         #load parameter from yaml
         self.declare_parameters(namespace='', parameters=[
             ('velocity_max', 0.2),
@@ -80,6 +83,8 @@ class Controller(Node):
         self.timeStamp = time.time()
         self.timePeriod = 0
         self.path_msg = Path()
+        self.write = False
+        self.last_goal = None
         self.get_logger().info(f"Kp: {self.Kp} Ki: {self.Ki} Kd: {self.Kd}")
         self.get_logger().info(f"max velocity: {self.v_max} max acceleration: {self.a_max}")
 
@@ -122,7 +127,7 @@ class Controller(Node):
     def ik(self, ws):
         x = ws[0]
         y = ws[1]
-        z = ws[2]
+        z = ws[2] - self.DH[0, 2]
         gamma = -1
         l1 = self.DH[2, 0]
         l2 = self.H_e_n[0, -1]
@@ -173,55 +178,63 @@ class Controller(Node):
         self.J = self.endEffectorJacobian(self.joint_config)
     
     def enb_callback(self,request,response):
-        #compute trajectory
-        tf = 0.1
         joint_i = self.joint_config
         [R, P] = self.fk(joint_i)
         ws_i = R[-1][:3,-1]
         ws_f = np.array([request.destination.x, request.destination.y, request.destination.z])
-        length = np.linalg.norm(ws_f-ws_i)
-        response = Destination.Response()
-        while True:
-            D = np.array([[5*tf**2, 4*tf, 3],
-                    [20*tf**2, 12*tf, 6],
-                    [tf**5, tf**4, tf**3]])
-            Da = np.array([[0, 4*tf, 3],
-                            [0, 12*tf, 6],
-                            [length, tf**4, tf**3]])
-            Db = np.array([[5*tf**2, 0, 3],
-                            [20*tf**2, 0, 6],
-                            [tf**5, length, tf**3]])
-            Dc = np.array([[5*tf**2, 4*tf, 0],
-                            [20*tf**2, 12*tf, 0],
-                            [tf**5, tf**4, length]])
-
-            A = np.linalg.det(Da)/np.linalg.det(D)
-            B = np.linalg.det(Db)/np.linalg.det(D)
-            C = np.linalg.det(Dc)/np.linalg.det(D)
-            t_half = tf/2
-            t_quater = tf/4
-            if np.abs(5*A*t_half**4 + 4*B*t_half**3 + 3*C*t_half**2)<=self.v_max and np.abs(20*A*t_quater**3 + 12*B*t_quater**2 + 6*C*t_quater)<=self.a_max:
-                break
-            tf = 1.1*tf
-        for t in np.arange(0,tf+self.dt,self.dt):
-            # lenght_percent = (A*t**5 + B*t**4 + C*t**3)/length
-            # pos_3d = (ws_f-ws_i)*lenght_percent + ws_i
-            wsd_t = 5*A*t**4 + 4*B*t**3 + 3*C*t**2
-            velo_3d = (ws_f-ws_i)/length * wsd_t
-            J = self.endEffectorJacobian(joint_i)
-            if self.checkSingularity(joint_i):
-                response.success.data = False
-                return response
-            joint_qd = np.linalg.inv(J[3:]) @ velo_3d
-            joint_i = joint_i + (joint_qd * self.dt)
-        self.isEnb = True
-        self.A = A
-        self.B = B
-        self.C = C
-        self.timePeriod = tf
         self.ws_start = ws_i
         self.ws_goal = ws_f
         self.write = request.write.data
+        self.send_goal(ws_i, ws_f)
+        #compute trajectory
+        # tf = 0.1
+        # joint_i = self.joint_config
+        # [R, P] = self.fk(joint_i)
+        # ws_i = R[-1][:3,-1]
+        # ws_f = np.array([request.destination.x, request.destination.y, request.destination.z])
+        # length = np.linalg.norm(ws_f-ws_i)
+        # response = Destination.Response()
+        # while True:
+        #     D = np.array([[5*tf**2, 4*tf, 3],
+        #             [20*tf**2, 12*tf, 6],
+        #             [tf**5, tf**4, tf**3]])
+        #     Da = np.array([[0, 4*tf, 3],
+        #                     [0, 12*tf, 6],
+        #                     [length, tf**4, tf**3]])
+        #     Db = np.array([[5*tf**2, 0, 3],
+        #                     [20*tf**2, 0, 6],
+        #                     [tf**5, length, tf**3]])
+        #     Dc = np.array([[5*tf**2, 4*tf, 0],
+        #                     [20*tf**2, 12*tf, 0],
+        #                     [tf**5, tf**4, length]])
+
+        #     A = np.linalg.det(Da)/np.linalg.det(D)
+        #     B = np.linalg.det(Db)/np.linalg.det(D)
+        #     C = np.linalg.det(Dc)/np.linalg.det(D)
+        #     t_half = tf/2
+        #     t_quater = tf/4
+        #     if np.abs(5*A*t_half**4 + 4*B*t_half**3 + 3*C*t_half**2)<=self.v_max and np.abs(20*A*t_quater**3 + 12*B*t_quater**2 + 6*C*t_quater)<=self.a_max:
+        #         break
+        #     tf = 1.1*tf
+        # for t in np.arange(0,tf+self.dt,self.dt):
+        #     # lenght_percent = (A*t**5 + B*t**4 + C*t**3)/length
+        #     # pos_3d = (ws_f-ws_i)*lenght_percent + ws_i
+        #     wsd_t = 5*A*t**4 + 4*B*t**3 + 3*C*t**2
+        #     velo_3d = (ws_f-ws_i)/length * wsd_t
+        #     J = self.endEffectorJacobian(joint_i)
+        #     if self.checkSingularity(joint_i):
+        #         response.success.data = False
+        #         return response
+        #     joint_qd = np.linalg.inv(J[3:]) @ velo_3d
+        #     joint_i = joint_i + (joint_qd * self.dt)
+        # self.isEnb = True
+        # self.A = A
+        # self.B = B
+        # self.C = C
+        # self.timePeriod = tf
+        # self.ws_start = ws_i
+        # self.ws_goal = ws_f
+        # self.write = request.write.data
         response.success.data = True
         return response
 
@@ -240,20 +253,22 @@ class Controller(Node):
                 self.state = "WAIT"
                 R, P = self.fk(joint_home)
                 self.ws_goal = P[-1]
-                self.get_logger().info("WAIT")
+                self.last_goal = self.ws_goal
+                # self.get_logger().info("WAIT")
                 self.send_request()
         elif self.state == "FORWARD":
             t = time.time() - self.timeStamp
             if t <= self.timePeriod:
                 lenght_percent = (self.A*t**5 + self.B*t**4 + self.C*t**3)/np.linalg.norm(self.ws_goal-self.ws_start)
+                # self.get_logger().info(f"{lenght_percent}")
                 ws_t = (self.ws_goal-self.ws_start)*lenght_percent + self.ws_start
                 wsd_t = 5*self.A*t**4 + 4*self.B*t**3 + 3*self.C*t**2
-                velo_3d = (self.ws_goal-self.ws_start)/np.linalg.norm(self.ws_goal-self.ws_start) * wsd_t
+                velo_3d = ((self.ws_goal-self.ws_start)/np.linalg.norm(self.ws_goal-self.ws_start)) * wsd_t
             else:
                 ws_t = self.ws_goal
                 velo_3d = np.array([0.0, 0.0, 0.0])
             self.control(ws_t,velo_3d)
-            # self.get_logger().info(f"{self.ws_feedback}")
+            # self.get_logger().info(f"position: {self.ws_feedback}")
             if self.write:
                 pose_msg.header.stamp = self.get_clock().now().to_msg()
                 pose_msg.pose.position.x = self.ws_feedback[0]
@@ -268,11 +283,11 @@ class Controller(Node):
                 self.last_error = 0
                 self.error_diff = 0
                 self.get_logger().info(f"destiantion arrival x:{self.ws_goal[0]} y:{self.ws_goal[1]} z:{self.ws_goal[2]}")
+                self.last_goal = self.ws_goal
                 self.send_request()
         elif self.state == "WAIT":
             velo_3d = np.array([0.0, 0.0, 0.0])
-            self.control(self.ws_goal,velo_3d)
-            # self.get_logger().info(f"{self.ws_feedback}")
+            self.control(self.last_goal,velo_3d)
             if self.isEnb:
                 self.timeStamp = time.time()
                 self.error = 0
@@ -287,7 +302,7 @@ class Controller(Node):
         self.velocity_publihser.publish(velocity_pub_msg)
             
     def proximity(self,q, q_check):
-        if (np.linalg.norm(q-q_check) < 0.005).all():
+        if np.linalg.norm(q-q_check) < 0.005:
             return 1
         return 0
     
@@ -295,12 +310,47 @@ class Controller(Node):
         q_ref = self.ik(ws_t)
         qd_ref = np.linalg.inv(self.J[3:]) @ v_t
         self.error = q_ref - self.ik(self.ws_feedback)
+        # self.get_logger().info(f"ws_t: {ws_t}")
         self.error_sum += self.error
+        self.error_diff = self.error - self.last_error
         pid = qd_ref + self.Kp * (self.error) + self.Ki * (self.error_sum) + self.Kd * (self.error_diff)
         self.velocity = [pid[0], pid[1], pid[2]]
-        self.error_diff = self.error - self.last_error
         self.last_error = self.error
 
+    def send_goal(self, startPos, goalPos):
+        goal_msg = TrajectoryGoal.Goal()
+        goal_msg.startpos.x = startPos[0]
+        goal_msg.startpos.y = startPos[1]
+        goal_msg.startpos.z = startPos[2]
+        goal_msg.goalpos.x = goalPos[0]
+        goal_msg.goalpos.y = goalPos[1]
+        goal_msg.goalpos.z = goalPos[2]
+        goal_msg.v_max.data = self.v_max
+        goal_msg.a_max.data = self.a_max
+        self._action_client.wait_for_server()
+
+        self._send_goal_future = self._action_client.send_goal_async(goal_msg)
+
+        self._send_goal_future.add_done_callback(self.goal_response_callback)
+    
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('Goal rejected :(')
+            return
+
+        self.get_logger().info('Goal accepted :)')
+
+        self._get_result_future = goal_handle.get_result_async()
+        self._get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        result = future.result().result
+        self.isEnb = True
+        self.A = result.a.data
+        self.B = result.b.data
+        self.C = result.c.data
+        self.timePeriod = result.timeperiod.data
  
 def main(args=None):
     rclpy.init(args=args)

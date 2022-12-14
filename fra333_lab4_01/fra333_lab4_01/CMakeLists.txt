@@ -23,6 +23,7 @@ find_package(std_msgs REQUIRED)
 install(PROGRAMS
   scripts/controller.py
   scripts/scheduler.py
+  scripts/generator.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

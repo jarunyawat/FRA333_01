@@ -1,4 +1,10 @@
-std_msgs/UInt32 time
-geometry_msgs/Point destination
+geometry_msgs/Point startpos
+geometry_msgs/Point goalpos
+std_msgs/Float64 v_max
+std_msgs/Float64 a_max
 ---
+std_msgs/Float64 a
+std_msgs/Float64 b
+std_msgs/Float64 c
+std_msgs/Float64 timeperiod
 ---

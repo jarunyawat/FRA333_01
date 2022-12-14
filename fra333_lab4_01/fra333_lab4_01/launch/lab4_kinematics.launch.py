@@ -40,23 +40,21 @@ def generate_launch_description():
     scheduler_node = Node(
         package="fra333_lab4_01",
         executable="scheduler.py",
-        parameters = [scheduler_config]
+        # parameters = [scheduler_config]
     )
 
-    # event_handler = RegisterEventHandler(
-    #         OnExecutionComplete(
-    #             target_action=scheduler_node,
-    #             on_completion=[
-    #                 jog_node
-    #             ]
-    #         )
-    # ),
-    # jog_node = Node(
-    #     package="fra333_lab4_01",
-    #     executable="controller.py",
-    #     parameters = [controller_config]
-    # )
-    # entity_to_run.add_action(sentinel_spawn)
-    # entity_to_run.add_action(event_handler)
-    entity_to_run.add_action(scheduler_node)
+    jog_node = Node(
+        package="fra333_lab4_01",
+        executable="controller.py",
+        parameters = [controller_config]
+    )
+
+    generate_node = Node(
+        package="fra333_lab4_01",
+        executable="generator.py",
+    )
+
+    entity_to_run.add_action(sentinel_spawn)
+    entity_to_run.add_action(jog_node)
+    entity_to_run.add_action(generate_node)
     return entity_to_run
