@@ -26,14 +26,14 @@ class Controller(Node):
         self._action_client = ActionClient(self, TrajectoryGoal, 'generate_path')
         #load parameter from yaml
         self.declare_parameters(namespace='', parameters=[
-            ('velocity_max', 0.2),
+            ('velocity_max', 0.5),
             ('acceleration_max', 0.5),
-            ('Kp.Kp_joint_1', 1.0),
-            ('Kp.Kp_joint_2', 3.0),
-            ('Kp.Kp_joint_3', 3.0),
-            ('Ki.Ki_joint_1', 0.001),
-            ('Ki.Ki_joint_2', 0.002),
-            ('Ki.Ki_joint_3', 0.003),
+            ('Kp.Kp_joint_1', 5.0),
+            ('Kp.Kp_joint_2', 7.0),
+            ('Kp.Kp_joint_3', 7.0),
+            ('Ki.Ki_joint_1', 0.007),
+            ('Ki.Ki_joint_2', 0.007),
+            ('Ki.Ki_joint_3', 0.007),
             ('Kd.Kd_joint_1', 2.0),
             ('Kd.Kd_joint_2', 2.0),
             ('Kd.Kd_joint_3', 2.0),
@@ -186,55 +186,6 @@ class Controller(Node):
         self.ws_goal = ws_f
         self.write = request.write.data
         self.send_goal(ws_i, ws_f)
-        #compute trajectory
-        # tf = 0.1
-        # joint_i = self.joint_config
-        # [R, P] = self.fk(joint_i)
-        # ws_i = R[-1][:3,-1]
-        # ws_f = np.array([request.destination.x, request.destination.y, request.destination.z])
-        # length = np.linalg.norm(ws_f-ws_i)
-        # response = Destination.Response()
-        # while True:
-        #     D = np.array([[5*tf**2, 4*tf, 3],
-        #             [20*tf**2, 12*tf, 6],
-        #             [tf**5, tf**4, tf**3]])
-        #     Da = np.array([[0, 4*tf, 3],
-        #                     [0, 12*tf, 6],
-        #                     [length, tf**4, tf**3]])
-        #     Db = np.array([[5*tf**2, 0, 3],
-        #                     [20*tf**2, 0, 6],
-        #                     [tf**5, length, tf**3]])
-        #     Dc = np.array([[5*tf**2, 4*tf, 0],
-        #                     [20*tf**2, 12*tf, 0],
-        #                     [tf**5, tf**4, length]])
-
-        #     A = np.linalg.det(Da)/np.linalg.det(D)
-        #     B = np.linalg.det(Db)/np.linalg.det(D)
-        #     C = np.linalg.det(Dc)/np.linalg.det(D)
-        #     t_half = tf/2
-        #     t_quater = tf/4
-        #     if np.abs(5*A*t_half**4 + 4*B*t_half**3 + 3*C*t_half**2)<=self.v_max and np.abs(20*A*t_quater**3 + 12*B*t_quater**2 + 6*C*t_quater)<=self.a_max:
-        #         break
-        #     tf = 1.1*tf
-        # for t in np.arange(0,tf+self.dt,self.dt):
-        #     # lenght_percent = (A*t**5 + B*t**4 + C*t**3)/length
-        #     # pos_3d = (ws_f-ws_i)*lenght_percent + ws_i
-        #     wsd_t = 5*A*t**4 + 4*B*t**3 + 3*C*t**2
-        #     velo_3d = (ws_f-ws_i)/length * wsd_t
-        #     J = self.endEffectorJacobian(joint_i)
-        #     if self.checkSingularity(joint_i):
-        #         response.success.data = False
-        #         return response
-        #     joint_qd = np.linalg.inv(J[3:]) @ velo_3d
-        #     joint_i = joint_i + (joint_qd * self.dt)
-        # self.isEnb = True
-        # self.A = A
-        # self.B = B
-        # self.C = C
-        # self.timePeriod = tf
-        # self.ws_start = ws_i
-        # self.ws_goal = ws_f
-        # self.write = request.write.data
         response.success.data = True
         return response
 
@@ -270,8 +221,9 @@ class Controller(Node):
             self.control(ws_t,velo_3d)
             # self.get_logger().info(f"position: {self.ws_feedback}")
             if self.write:
-                pose_msg.header.stamp = self.get_clock().now().to_msg()
-                pose_msg.pose.position.x = self.ws_feedback[0]
+                self.path_msg.header.stamp = self.get_clock().now().to_msg()
+                self.path_msg.header.frame_id = "world"
+                pose_msg.pose.position.x= self.ws_feedback[0]
                 pose_msg.pose.position.y = self.ws_feedback[1]
                 pose_msg.pose.position.z = self.ws_feedback[2]
                 self.path_msg.poses.append(pose_msg)
@@ -296,8 +248,6 @@ class Controller(Node):
                 self.error_diff = 0
                 self.state = "FORWARD"
         velocity_pub_msg.data = self.velocity
-        self.path_msg.header.stamp = pose_msg.header.stamp
-        self.path_msg.header.frame_id = 'world'
         self.path_publihser.publish(self.path_msg)
         self.velocity_publihser.publish(velocity_pub_msg)
             

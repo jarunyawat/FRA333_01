@@ -11,6 +11,6 @@ controller_node:
             Ki_joint_2: 0.007
             Ki_joint_3: 0.007
         Kd:
-            Kd_joint_1: 1.0
-            Kd_joint_2: 1.0
-            Kd_joint_3: 1.0
+            Kd_joint_1: 2.0
+            Kd_joint_2: 2.0
+            Kd_joint_3: 2.0
